@@ -1,0 +1,32 @@
+# ---- Gradle / 构建产物 ----
+.gradle/
+build/
+*/build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- Kotlin / Android ----
+.kotlin/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ---- Node（浏览器对拍工具）----
+tools/reference-gen/node_modules/
+tools/reference-gen/.browser-geometry.html
+
+# ---- 平台缓存 ----
+.dsh/
+
+# ---- macOS ----
+.DS_Store
+._*
+
+# ---- 明确**保留**（验收依据，不是产物）----
+# reference/*.png     渲染/真机证据
+# reference/*.tsv     规则级与渲染级金标准
+# reference/fonts/    对拍所用 OFL 字体（KhetiFontFamilies / 测试共用同一 TTF）
+# docs/  .trellis/    需求基线与流程记录
