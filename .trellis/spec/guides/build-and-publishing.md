@@ -101,7 +101,56 @@ val g = m.range
 远端仓库**按凭据是否存在启用**，所以缺凭据时既不会误传远端，也不会让本地构建失败。
 
 完整流程（Maven Central / GitHub Packages / JitPack、GPG 签名、
-上传后必需的一次 Portal 调用）见 `docs/publishing.md`。
+上传后必需的一次 Portal 调用）见 `docs/publishing.md`；
+一次性凭据配置用 `tools/setup-central-publishing.sh`。
+
+### 签名挂钩必须用惰性 API（踩过的坑）
+
+KMP 的 `publishing.publications` 是 **KGP 在自己的 `afterEvaluate` 里**创建的。
+如果在更早的 `afterEvaluate` 里 `publications.forEach { signing.sign(it) }`，
+那时集合还是**空的** —— 一个签名任务都不会创建，`publish` 也不会报错，
+而是**静默上传未签名构件**，直到 Maven Central 校验时才被拒收。
+
+正确写法是用 `sign(DomainObjectCollection<Publication>)`，它是惰性的：
+
+```kotlin
+val publications = extensions.getByType(PublishingExtension::class.java).publications
+extensions.configure<SigningExtension> {
+    useInMemoryPgpKeys(signingKey, signingPassword)
+    sign(publications)          // 之后加入的 publication 也会被签
+}
+```
+
+**验证方法**（不要只看构建成功）：给一个假私钥，构建应当**报错**；
+若它安静通过，说明签名根本没挂上。
+
+```bash
+printf -- "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\ndummy\n-----END PGP PRIVATE KEY BLOCK-----\n" > /tmp/fake.asc
+./gradlew :kheti-core:tasks -Psigning.keyFile=/tmp/fake.asc -Psigning.password=x
+# 期望：Could not create task ':kheti-core:checkSigningConfiguration' → Could not read PGP secret key
+# 若 BUILD SUCCESSFUL 且没有 sign* 任务 → 签名没挂上
+```
+
+### 私钥的三种提供方式
+
+`gradle/publishing.gradle.kts` 按优先级读取：
+
+1. 环境变量 `SIGNING_KEY`（内容）—— CI 用
+2. Gradle 属性 `signing.key`（内容）—— **不推荐**：多行 ASCII 私钥在 properties 里要转义换行
+3. Gradle 属性 `signing.keyFile`（文件路径）—— 本地发布推荐
+
+本地配置由 `tools/setup-central-publishing.sh` 写入仓库外的
+`~/.gradle/gradle.properties`（`sonatype.username` / `sonatype.password` /
+`signing.keyFile` / `signing.password`）。
+
+### GPG 密钥的两个硬性要求
+
+- **必须用 RSA**：GnuPG 默认的 ECC/ed25519 会生成「签名子密钥」，
+  而 Maven Central（Nexus）只能用**主密钥**验签；带签名子密钥会导致发布验签失败
+  （官方文档 “Delete a Sub Key” 一节）。已生成的可用 `gpg --edit-key` 删除或撤销该子密钥。
+- **公钥必须发布到官方支持的 keyserver**：`keyserver.ubuntu.com` /
+  `keys.openpgp.org` / `pgp.mit.edu`（openpgp.org 需先做邮箱验证）。
+
 
 ---
 

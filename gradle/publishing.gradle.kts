@@ -142,18 +142,30 @@ extensions.configure<PublishingExtension> {
 }
 
 // ---- GPG 签名（仅在有私钥时启用，本地 publishToMavenLocal 不受影响）----
-val signingKey = providers.environmentVariable("SIGNING_KEY").orNull
-    ?: providers.gradleProperty("signing.key").orNull
+// 私钥按以下优先级获取：
+//   1. 环境变量 SIGNING_KEY          —— CI 用，值为 ASCII 私钥内容
+//   2. Gradle 属性 signing.key       —— 值即内容；多行私钥在 properties 里需转义换行，不推荐
+//   3. Gradle 属性 signing.keyFile   —— 文件路径；本地发布推荐（tools/setup-central-publishing.sh 用这个）
+val envSigningKey = providers.environmentVariable("SIGNING_KEY").orNull
+val inlineSigningKey = providers.gradleProperty("signing.key").orNull
+val signingKeyFilePath = providers.gradleProperty("signing.keyFile").orNull
+val signingKey = when {
+    !envSigningKey.isNullOrBlank() -> envSigningKey
+    !inlineSigningKey.isNullOrBlank() -> inlineSigningKey
+    !signingKeyFilePath.isNullOrBlank() -> file(signingKeyFilePath).takeIf { it.isFile }?.readText()?.trim()
+    else -> null
+}
 val signingPassword = providers.environmentVariable("SIGNING_PASSWORD").orNull
     ?: providers.gradleProperty("signing.password").orNull
 
 if (!signingKey.isNullOrBlank()) {
+    // 注意时机：KMP 的 publications 是 KGP 在自己的 afterEvaluate 里创建的，
+    // 若在更早的 afterEvaluate 里用 forEach 遍历，集合还是空的 —— 结果是一个签名任务
+    // 都不创建，静默上传未签名构件（Maven Central 会拒收）。
+    // sign(DomainObjectCollection<Publication>) 是惰性的：之后加入的 publication 也会被签。
+    val publications = extensions.getByType(PublishingExtension::class.java).publications
     extensions.configure<SigningExtension> {
         useInMemoryPgpKeys(signingKey, signingPassword)
-    }
-    project.afterEvaluate {
-        val publications = extensions.getByType(PublishingExtension::class.java).publications
-        val signing = extensions.getByType(SigningExtension::class.java)
-        publications.forEach { signing.sign(it) }
+        sign(publications)
     }
 }

@@ -46,6 +46,19 @@ kheti 以标准 Maven 坐标发布，第三方 KMP 项目用一行 `implementati
 2. 生成 **Portal User Token**（用户名 + 密码）。
 3. 准备 GPG 密钥并发布公钥：`gpg --gen-key` → `gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>`。
 
+> **这三步有脚本可跑**：`tools/setup-central-publishing.sh` 会逐段带你完成
+> （本机缺 gpg 时先装、生成密钥、发公钥、生成 token、导出私钥、写入 Gradle 配置并自检），
+> 机密写到仓库外的 `~/.gradle/gradle.properties`，可反复重跑且幂等。
+>
+> ```bash
+> ./tools/setup-central-publishing.sh
+> ```
+>
+> 两个容易踩的点，脚本会替你拦住：
+> - **密钥类型选 RSA**：默认的 ECC/ed25519 会生成「签名子密钥」，而 Nexus 只能用**主密钥**验签；
+> - **口令写错**：脚本会在临时钥匙串里用导出的私钥真签一次，口令不对当场报错，
+>   而不是等到 `publish` 时才失败。
+
 然后：
 
 ```bash
