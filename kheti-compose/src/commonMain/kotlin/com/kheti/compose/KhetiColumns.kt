@@ -76,7 +76,7 @@ fun KhetiColumns(
     val fonts = LocalKhetiFontFamilies.current
     val colors = LocalKhetiColors.current
     val style = remember(size, flavor, fonts) { KhetiTextStyle.body(size, flavor, fonts) }
-    val resolvedColor = if (color == Color.Unspecified) colors.ink else color
+    val resolvedColor = resolveKhetiColor(color, colors)
     val measurer = rememberTextMeasurer()
     val engine = remember(measurer, density) { KhetiEngine(measurer, density) }
     val fontPx = with(density) { style.fontSize.toPx() }
