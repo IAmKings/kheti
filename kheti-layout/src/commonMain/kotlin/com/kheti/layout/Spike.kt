@@ -20,6 +20,29 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import com.kheti.AdjustmentPlanner
 import kotlin.math.abs
+import kotlin.math.round
+
+/**
+ * 可移植的定点格式化，等价于 `"%<width>.<decimals>f".format(value)`。
+ *
+ * common 代码里没有 `String.format`（那是 JVM 专有 API）：平台编译能用，
+ * 但 metadata / native 编译会报 Unresolved reference。发布 KMP 公共构件时必须避开。
+ */
+private fun fixed(value: Float, decimals: Int, width: Int = 0): String {
+    var factor = 1L
+    repeat(decimals) { factor *= 10 }
+    val scaled = round(value.toDouble() * factor).toLong()
+    val sign = if (scaled < 0) "-" else ""
+    val magnitude = if (scaled < 0) -scaled else scaled
+    val intPart = magnitude / factor
+    val fracPart = magnitude % factor
+    val body = if (decimals == 0) {
+        "$sign$intPart"
+    } else {
+        "$sign$intPart.${fracPart.toString().padStart(decimals, '0')}"
+    }
+    return if (width > body.length) body.padStart(width) else body
+}
 
 /**
  * Phase 0 证据探针（临时代码，Phase 4 前删除）。
@@ -128,9 +151,8 @@ object Spike {
         appendLine("$title（请求值 → 首位移 / 尾增量 / 整行Δ，单位 px）")
         for (r in rows) {
             appendLine(
-                "  %8.3f → lead %8.3f | trail %8.3f | total %8.3f".format(
-                    r.requestedPx, r.leadingShiftPx, r.trailingAdvancePx, r.totalDeltaPx
-                )
+                "  ${fixed(r.requestedPx, 3, 8)} → lead ${fixed(r.leadingShiftPx, 3, 8)}" +
+                    " | trail ${fixed(r.trailingAdvancePx, 3, 8)} | total ${fixed(r.totalDeltaPx, 3, 8)}"
             )
         }
     }
@@ -151,9 +173,9 @@ object Spike {
     ) {
         fun summary(): String = buildString {
             appendLine("Spike B — 整行度量 → 逐字定位 → 分段自绘（文本：$planText）")
-            appendLine("  字符数=$charCount  光标位单调=$cursorMonotonic  最大 advance 误差=${"%.4f".format(maxAdvanceErrorPx)}px")
+            appendLine("  字符数=$charCount  光标位单调=$cursorMonotonic  最大 advance 误差=${fixed(maxAdvanceErrorPx, 4)}px")
             appendLine("  整行绘制 vs 逐字分段绘制：像素差异=$wholeVsSegmentedDiffPixels")
-            appendLine("  墨迹宽度：未调整=${inkWidthPlainPx}px  调整后=${inkWidthAdjustedPx}px  差=${inkWidthDeltaPx}px  期望=${"%.2f".format(expectedDeltaPx)}px")
+            appendLine("  墨迹宽度：未调整=${inkWidthPlainPx}px  调整后=${inkWidthAdjustedPx}px  差=${inkWidthDeltaPx}px  期望=${fixed(expectedDeltaPx, 2)}px")
             appendLine("  规划出的调整区间数=$adjustmentCount")
         }
     }

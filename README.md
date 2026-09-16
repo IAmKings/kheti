@@ -21,6 +21,24 @@
 | 竖排（Compose 全平台零支持） | 6 列、列距 = 行高 30 逻辑px、縦中横、区域标点、悬挂、ruby 在基文右侧 |
 | 真机与桌面规则等价（与字体无关的量） | `KhetiEngineAndroidTest`（真机 PJZ110 / Android 16） |
 
+## 引用（第三方项目）
+
+已按标准 Maven 坐标发布，可直接依赖，无需源码引入：
+
+```kotlin
+commonMain.dependencies {
+    implementation("io.github.iamkings:kheti-compose:0.1.0")
+}
+```
+
+Gradle 会按目标平台自动选构件：Android 取 AAR、Desktop/JVM 取 JAR、iOS 取 klib。
+`kheti-compose` 已把 `kheti-core`、`kheti-layout`、`compose.ui`、`compose.runtime`
+声明为 `api`，使用方只需声明这一个依赖即可编译。
+只需规则层或引擎层时，可单独依赖 `kheti-core` / `kheti-layout`。
+
+> 发布流程（Maven Central / GitHub Packages / JitPack 三条通道、签名与凭据、
+> 上传后必需的一次 Portal 调用）见 **[docs/publishing.md](docs/publishing.md)**。
+
 ## 快速开始
 
 ```kotlin

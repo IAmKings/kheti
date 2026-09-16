@@ -1,17 +1,25 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidLibrary)
+    // AGP 9 起 KMP 的 Android 目标必须用官方 KMP 库插件；
+    // 旧的 com.android.library + androidTarget() 组合已被 KGP 标记为 deprecated，
+    // 且不会产出 Android publication（第三方 Android 使用方将无法解析构件）。
+    alias(libs.plugins.androidKmpLibrary)
 }
 
+// 发布约定：坐标、POM 元数据、sources/javadoc 伴随件、按凭据启用远端仓库
+apply(from = rootProject.file("gradle/publishing.gradle.kts"))
+
 kotlin {
-    androidTarget {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    android {
+        namespace = "com.kheti.core"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -32,18 +40,6 @@ kotlin {
         desktopTest.dependencies {
             implementation(kotlin("test"))
         }
-    }
-}
-
-android {
-    namespace = "com.kheti.core"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

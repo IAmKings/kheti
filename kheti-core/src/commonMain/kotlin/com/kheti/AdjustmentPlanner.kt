@@ -62,7 +62,14 @@ object AdjustmentPlanner {
 
         // ---- 1. 中西文间距（FULL → START → END，先到先得）----
         fun applyGap(m: MatchResult, trimLead: Boolean, trimTrail: Boolean, addLead: Boolean, addTrail: Boolean) {
-            val g = m.groups[1]?.range ?: return
+            // 三个间距正则都用环视（`(?<=…)` / `(?=…)`，均为零宽）把捕获组 1 限定为整个匹配，
+            // 因此组 1 的区间恒等于 m.range。
+            //
+            // 这里刻意不写 `m.groups[1]?.range`：`MatchGroup.range` 没有出现在 Kotlin 2.4.10 的
+            // **公共元数据**里，metadata 编译（发布 KMP 公共构件所必需）会报 Unresolved reference。
+            // 平台编译不受影响，所以这个坑只在发布时才暴露。
+            if (m.groups[1] == null) return
+            val g = m.range
             for (i in g) if (assigned[i]) return // 已被 FULL 命中：后续趟次跳过（等价上游 skip）
             var s = g.first
             var e = g.last

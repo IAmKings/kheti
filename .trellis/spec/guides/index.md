@@ -23,6 +23,8 @@ These guides help you **ask the right questions before coding**.
 |-------|---------|-------------|
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
+| [UI 文本与颜色约定](./ui-text-and-color-conventions.md) | 排版/渲染层的颜色、字距、竖排与证据纪律 | 改动 kheti-compose / kheti-layout 的渲染与公共 API 时 |
+| [构建与发布约定](./build-and-publishing.md) | AGP KMP 插件、api/implementation 边界、metadata 编译守门、发布坐标 | 改动 build.gradle.kts、依赖可见性或执行发布时 |
 
 ---
 
