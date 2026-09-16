@@ -291,18 +291,34 @@ ask_secret SONATYPE_PASSWORD "粘贴 token 的 Password（输入不可见）："
 
 # ── Stage 5 — 导出私钥 ────────────────────────────────────────────────────
 stage "导出私钥到本地文件"
-say "发布时 Gradle 需要读私钥来签名。导出为 ASCII 文件并收紧权限。"
-note "gpg 可能会要求你输入私钥口令，按提示输入即可。"
+say "发布时 Gradle 需要用私钥签名。先给出口令，再用口令**非交互地**导出。"
 note ""
-if gpg --armor --export-secret-keys "$KEY_ID" > "$KEY_FILE" 2>/dev/null && [[ -s "$KEY_FILE" ]]; then
-  chmod 600 "$KEY_FILE"
-  say "已导出：$KEY_FILE（权限 600）"
-else
-  warn "导出失败。请手动执行："
-  step "gpg --armor --export-secret-keys $KEY_ID > $KEY_FILE && chmod 600 $KEY_FILE"
-  pause "完成后按 Enter 继续…"
-fi
+warn "反面教材（真踩过）：直接 gpg --armor --export-secret-keys > file 在 GnuPG 2.5 上"
+warn "需要口令，而脚本里 pinentry 弹不出窗 —— 结果留下一个 0 字节文件。"
+warn "Gradle 读到空密钥会**静默跳过签名**，publish 照样成功，"
+warn "直到 Maven Central 校验才报 Missing signature。"
+note ""
 ask_secret SIGNING_PASSWORD "输入私钥口令（生成密钥时设的 passphrase）："
+
+say "导出中…"
+attempt=0
+while :; do
+  attempt=$((attempt + 1))
+  gpg --batch --pinentry-mode loopback --passphrase "$SIGNING_PASSWORD" \
+      --armor --export-secret-keys "$KEY_ID" > "$KEY_FILE" 2>/tmp/kheti-gpg-export.err || true
+  if [[ -s "$KEY_FILE" ]] && grep -q "BEGIN PGP PRIVATE KEY BLOCK" "$KEY_FILE"; then
+    chmod 600 "$KEY_FILE"
+    say "已导出：$KEY_FILE（$(wc -c < "$KEY_FILE" | tr -d ' ') 字节，权限 600）"
+    break
+  fi
+  warn "导出失败或输出为空。gpg 的说明："
+  sed 's/^/    /' /tmp/kheti-gpg-export.err | head -5
+  if (( attempt >= 3 )); then
+    warn "连续 3 次失败。请手动排查（确认密钥 ID 与口令）后重跑本脚本。"
+    exit 1
+  fi
+  ask_secret SIGNING_PASSWORD "口令可能不对，再试一次（第 $((attempt + 1)) 次）："
+done
 
 # ── Stage 6 — 写入配置并自检 ──────────────────────────────────────────────
 stage "写入 Gradle 配置并自检"

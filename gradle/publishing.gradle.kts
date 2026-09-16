@@ -68,17 +68,27 @@ val javadocReadme = tasks.register("khetiJavadocReadme") {
     }
 }
 
-val javadocJar = tasks.register<Jar>("khetiJavadocJar") {
-    description = "占位 javadoc jar（Maven Central 校验要求，内含文档入口 README）"
-    archiveClassifier.set("javadoc")
-    from(javadocReadme)
-}
+// 每个 publication 需要一个独立的 javadoc jar 文件。
+// 共用一个文件会让多个签名任务争抢同一个 .asc 输出路径，Gradle 会报
+// “publishXxxPublication uses this output of task signYyyPublication without
+//  declaring an explicit or implicit dependency”。文件在磁盘上叫什么不影响发布名，
+// 发布名由 publication 坐标决定。
+val javadocJars = mutableMapOf<String, TaskProvider<Jar>>()
+fun javadocJarFor(publicationName: String): TaskProvider<Jar> =
+    javadocJars.getOrPut(publicationName) {
+        tasks.register<Jar>("${publicationName}JavadocJar") {
+            description = "占位 javadoc jar（Maven Central 校验要求，内含文档入口 README）"
+            archiveBaseName.set("$moduleName-$publicationName")
+            archiveClassifier.set("javadoc")
+            from(javadocReadme)
+        }
+    }
 
 // ---- POM 元数据 + 发布仓库 ----
 extensions.configure<PublishingExtension> {
     publications.withType<MavenPublication>().configureEach {
         // 每个构件都要有 javadoc 伴随件（sources 由各 Kotlin target 的 withSourcesJar() 提供）
-        artifact(javadocJar)
+        artifact(javadocJarFor(name))
 
         pom {
             name.set("${project.group}:$moduleName")
@@ -158,14 +168,24 @@ val signingKey = when {
 val signingPassword = providers.environmentVariable("SIGNING_PASSWORD").orNull
     ?: providers.gradleProperty("signing.password").orNull
 
+// 静默降级是最危险的：配了密钥却读不出内容时，构建照常成功，
+// 上传的却是未签名构件，直到 Maven Central 校验才报 Missing signature。
+// 常见成因：gpg --export-secret-keys 需要口令，非交互环境下输出 0 字节。
+if (!signingKeyFilePath.isNullOrBlank() && signingKey.isNullOrBlank()) {
+    logger.warn(
+        "kheti: signing.keyFile 指向的文件为空或不可读（$signingKeyFilePath），将跳过签名。" +
+            "发布到 Maven Central 会因缺少 .asc 签名被拒收。"
+    )
+}
+
 if (!signingKey.isNullOrBlank()) {
-    // 注意时机：KMP 的 publications 是 KGP 在自己的 afterEvaluate 里创建的，
-    // 若在更早的 afterEvaluate 里用 forEach 遍历，集合还是空的 —— 结果是一个签名任务
-    // 都不创建，静默上传未签名构件（Maven Central 会拒收）。
-    // sign(DomainObjectCollection<Publication>) 是惰性的：之后加入的 publication 也会被签。
+    // 用 configureEach 逐个挂钩：对「已存在」和「之后加入」的 publication 都会触发，
+    // 不依赖 KGP 创建 publication 的时机。
     val publications = extensions.getByType(PublishingExtension::class.java).publications
     extensions.configure<SigningExtension> {
         useInMemoryPgpKeys(signingKey, signingPassword)
-        sign(publications)
+        publications.withType(MavenPublication::class.java).configureEach {
+            sign(this)
+        }
     }
 }

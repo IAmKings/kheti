@@ -71,10 +71,35 @@ export SIGNING_PASSWORD=<私钥口令>
 ```
 
 > **上传后还有一步**：Gradle 内置 `maven-publish` 属于官方所说的 “Maven-API-like” 插件，
-> 它只发 PUT 请求、不告诉服务端「一次部署何时结束」。按官方要求，上传完还需从**同一个 IP**
-> 调用一次 `POST https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/io.github.iamkings`
-> （Bearer 认证：`base64(token用户名:token密码)`），部署才会出现在
-> <https://central.sonatype.com/publishing>，再从那里点 Release 才会进入 Maven Central。
+> 它只发 PUT 请求、不告诉服务端「一次部署何时结束」。按官方要求，上传完还需调用一次接口，
+> 部署才会出现在 <https://central.sonatype.com/publishing>，再从那里点 Publish
+> 才会进入 Maven Central。
+>
+> 认证统一是 **Bearer**：`base64(token用户名:token密码)`（不是 Basic 认证）。
+>
+> **两个端点，按 IP 是否变化二选一：**
+>
+> ```bash
+> T=$(printf '%s:%s' "$SONATYPE_USERNAME" "$SONATYPE_PASSWORD" | base64)
+>
+> # A. 出口 IP 未变（首选，最简单）
+> curl -H "Authorization: Bearer $T" -X POST \
+>   https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/io.github.iamkings
+>
+> # B. 出口 IP 变了 —— staging 仓库是按 IP 隔离的，A 会报
+> #    "No repository found for <key>/<新IP>/io.github.iamkings--default-repository"
+> #    此时先按 ip=any 查出仓库 key，再用 key 端点（不受 IP 限制）：
+> curl -s -H "Authorization: Bearer $T" \
+>   "https://ossrh-staging-api.central.sonatype.com/manual/search/repositories?ip=any&profile_id=io.github.iamkings"
+> # key 形如 qNyfCK/209.9.201.4/io.github.iamkings--default-repository，需 URL 编码后使用：
+> curl -H "Authorization: Bearer $T" -X POST \
+>   "https://ossrh-staging-api.central.sonatype.com/manual/upload/repository/<URL 编码后的 key>"
+> ```
+>
+> ⚠️ **家用宽带/代理会导致出口 IP 漂移**（本项目实测在 209.9.201.4 / 120.229.45.17 之间跳变），
+> 于是「上传」与「补调用」可能来自不同 IP。官方文档说 B 端点是为「用 UI 完成发布的发布者」
+> 准备的，实测跨 IP 可用。若 A、B 都失败，从当前 IP 重新 `./gradlew publish` 一次即可生成
+> 属于新 IP 的 staging 仓库。
 >
 > 若不想手工补这一步，可改用 `com.gradleup.nmcp` 或 `com.vanniktech.maven.publish`
 > 这类直接对接 Portal API 的插件——本项目为保持零第三方发布依赖而未采用。

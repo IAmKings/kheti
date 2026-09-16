@@ -104,31 +104,64 @@ val g = m.range
 上传后必需的一次 Portal 调用）见 `docs/publishing.md`；
 一次性凭据配置用 `tools/setup-central-publishing.sh`。
 
-### 签名挂钩必须用惰性 API（踩过的坑）
+### 签名：最危险的是"静默不签"（真实事故复盘）
 
-KMP 的 `publishing.publications` 是 **KGP 在自己的 `afterEvaluate` 里**创建的。
-如果在更早的 `afterEvaluate` 里 `publications.forEach { signing.sign(it) }`，
-那时集合还是**空的** —— 一个签名任务都不会创建，`publish` 也不会报错，
-而是**静默上传未签名构件**，直到 Maven Central 校验时才被拒收。
+首次发布到 Maven Central 时部署校验失败，报 `Missing signature for file: ...`，
+而 `./gradlew publish` 是**成功**的。复盘后的真实原因链：
 
-正确写法是用 `sign(DomainObjectCollection<Publication>)`，它是惰性的：
+1. 向导用 `gpg --armor --export-secret-keys > file` 导出私钥。
+   **GnuPG 2.5 导出私钥需要口令**，脚本里 pinentry 弹不出窗，于是留下一个 **0 字节文件**；
+   脚本又把 stderr 丢进了 `/dev/null`，失败原因一并丢失。
+2. `gradle/publishing.gradle.kts` 里 `signingKey` 读到空内容 → `isNullOrBlank()` 为真
+   → **整个签名段被跳过**，不报错。
+3. `publish` 因此照常成功，上传的却是无 `.asc` 的构件，直到 Central 校验才暴露。
+
+**教训**：
+- `signingKey` 为空时**必须告警**（`gradle/publishing.gradle.kts` 已加），
+  否则"配了密钥却是空的"和"没配密钥"在构建输出里长得一模一样；
+- 导出私钥要 `--batch --pinentry-mode loopback --passphrase`，且**不要吞 stderr**；
+- 判断"签名到底挂上没有"，看 **Sign 任务是否存在**与 **`.asc` 是否真的产出**，
+  而不是看 `publish` 成不成功。
+
+挂钩写法（`configureEach` 对已存在与后加入的 publication 都会触发）：
 
 ```kotlin
 val publications = extensions.getByType(PublishingExtension::class.java).publications
 extensions.configure<SigningExtension> {
     useInMemoryPgpKeys(signingKey, signingPassword)
-    sign(publications)          // 之后加入的 publication 也会被签
+    publications.withType(MavenPublication::class.java).configureEach { sign(this) }
 }
 ```
 
-**验证方法**（不要只看构建成功）：给一个假私钥，构建应当**报错**；
-若它安静通过，说明签名根本没挂上。
+**自检命令**（三条都要看）：
 
 ```bash
-printf -- "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\ndummy\n-----END PGP PRIVATE KEY BLOCK-----\n" > /tmp/fake.asc
-./gradlew :kheti-core:tasks -Psigning.keyFile=/tmp/fake.asc -Psigning.password=x
-# 期望：Could not create task ':kheti-core:checkSigningConfiguration' → Could not read PGP secret key
-# 若 BUILD SUCCESSFUL 且没有 sign* 任务 → 签名没挂上
+./gradlew :kheti-core:tasks --all | grep -E "^sign"      # 应列出 5 个 sign*Publication
+./gradlew :kheti-core:signDesktopPublication            # 应 BUILD SUCCESSFUL
+find kheti-core/build -name "*.asc" | head              # 应真的有 .asc 产出
+gpg --verify kheti-core/build/libs/kheti-core-desktop-0.1.0.jar.asc \
+             kheti-core/build/libs/kheti-core-desktop-0.1.0.jar   # 应报“完好的签名”
+```
+
+### javadoc 伴随件必须每个 publication 一个文件
+
+Central 要求每个 jar 都有 `-javadoc.jar`。若像最初那样**共用一个** `Jar` 任务挂给所有
+publication，多个签名任务会争抢同一个 `.asc` 输出路径，Gradle 直接报：
+
+```
+Task ':x:publishAndroidPublication...' uses this output of task ':x:signDesktopPublication'
+without declaring an explicit or implicit dependency
+```
+
+正确做法是按 publication 名分别注册（文件名唯一即可，磁盘文件名不影响发布名 ——
+发布名由 publication 坐标决定）：
+
+```kotlin
+fun javadocJarFor(publicationName: String) = tasks.register<Jar>("${publicationName}JavadocJar") {
+    archiveBaseName.set("$moduleName-$publicationName")
+    archiveClassifier.set("javadoc")
+    from(javadocReadme)
+}
 ```
 
 ### 私钥的三种提供方式
