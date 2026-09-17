@@ -51,7 +51,10 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    # macOS：桌面测试断言依赖平台默认 CJK 字体的折行/行宽，Linux runner 无 CJK 字体
+    # 时 5 项测试不成立（Phase2PoetryTest 3 项、Phase3VerticalTest 2 项）。
+    # macOS 与本机已验证的环境一致，也是 iOS 目标（Kotlin/Native）的自然宿主。
+    runs-on: macos-latest
     env:
       SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
       SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
