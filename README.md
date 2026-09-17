@@ -123,8 +123,9 @@ docs/           PRD（需求与验收基线）· ADR · 平台实测证据 · �
 
 ## 示例 App
 
+[下载测试包](https://github.com/IAmKings/kheti/releases/tag/sample-v0.1.0)（debug APK，Android 7.0+）：
+
 ```bash
-./gradlew :sample:run          # 桌面窗口
 ./gradlew :sample:installDebug # 安装到已连接设备
 ```
 
@@ -135,8 +136,22 @@ docs/           PRD（需求与验收基线）· ADR · 平台实测证据 · �
 中西文混排对照（左原生 `Text` / 右 kheti）· 行间注 · **文章模式**（标题/引用/分隔线/代码/列表/
 表格/多栏/脚注）。
 
-真机证据：`reference/app-android.png`、`app-android-poem.png`（字列对齐 + 悬挂）、
-`app-android-vertical.png`（竖排 6 列、列距 120px = 30 逻辑px）。
+### 真机截图（Android 16）
+
+| 横排模式 | 竖排模式 |
+| :---: | :---: |
+| ![横排模式：诗/词/古文/混排对照/行间注/文章模式](screens/横排模式.webp) | ![竖排模式：诗词竖排，列序右→左](screens/竖排模式.webp) |
+
+- **横排**：居中诗（行末标点悬挂）· 词的上下阕分段（段间距 24px）· 古文首行缩进 2em + 两端对齐 ·
+  与原生 `Text` 的混排对照 · 行间注内联模式 · 文章模式（标题/引用/代码/列表/表格/双栏/脚注）
+- **竖排**：诗与词竖排 —— **列序右→左、一句一列、标点悬挂到列尾之外**；
+  古文与文章模式保持横排（控制栏可见规则开关：中西文间距 / 基线网格 / 行间注(块)）
+
+> 截图存于 `screens/`（整页长图，WebP 压缩至约 450KB/张）。
+
+排版规则的**工程证据**（而非界面截图）见 `reference/`：`app-android.png`、
+`app-android-poem.png`（字列对齐 + 悬挂）、`app-android-vertical.png`
+（竖排 6 列、列距 120px = 30 逻辑px）。
 
 ## 验收与工具
 
