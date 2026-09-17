@@ -1,0 +1,99 @@
+# 构建 kheti 示例 App 的 debug APK，并发布到 GitHub Release 供用户下载测试。
+#
+# 触发：master 上与构建相关的文件变更，或手动触发。
+# 产物：sample/build/outputs/apk/debug/sample-debug.apk（debug 签名，可直接安装）
+#
+# Release 标签为 sample-v<kheti.version>，与库版本同源：
+#   - 同一版本重跑 → 覆盖同名资产（--clobber）
+#   - 升级版本     → 生成新的 tag / Release，旧版本仍可下载
+#
+# 注意：AGP 与 Compose 依赖的官方仓库由 settings.gradle.kts 在 CI 上自动切换
+# （GITHUB_ACTIONS=true 时走 google()/mavenCentral()，开发机才用阿里云镜像）。
+
+name: Sample APK
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "sample/**"
+      - "kheti-core/**"
+      - "kheti-layout/**"
+      - "kheti-compose/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sample-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(sed -n 's/^kheti.version=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug APK
+        run: ./gradlew :sample:assembleDebug --stacktrace
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAG: sample-v${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          APK=sample/build/outputs/apk/debug/sample-debug.apk
+          ASSET="kheti-sample-${VERSION}-debug.apk"
+          cp "$APK" "$ASSET"
+
+          cat > release-notes.md <<'NOTES'
+          ## 安装
+
+          - Android 7.0（API 24）及以上
+          - 下载 `kheti-sample-*-debug.apk` → 系统提示"未知来源"时允许 → 安装
+
+          ## 内容
+
+          赫蹏中文排版示例 App：诗词 / 词 / 古文 / 中西文混排对照 / 竖排 / 行间注 / 文章模式。
+          可切换字体风格（黑体/宋体/传统）、正文字号、横排竖排、赫蹏规则开关、
+          基线网格与深色模式。
+
+          ## 说明
+
+          - 这是 **debug 签名**的测试包，请勿当作正式版本分发或上架
+          - 版本号与库版本同源（见 `gradle.properties` 的 `kheti.version`）
+          - 同一版本重复构建会覆盖资产；升级版本会生成新的 Release，旧版仍可下载
+          NOTES
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在 → 覆盖资产"
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            echo "Release $TAG 不存在 → 创建"
+            gh release create "$TAG" "$ASSET" \
+              --target "$GITHUB_SHA" \
+              --prerelease \
+              --title "kheti 示例 App v${VERSION}（debug）" \
+              --notes-file release-notes.md
+          fi

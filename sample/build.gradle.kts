@@ -52,8 +52,14 @@ android {
         applicationId = "com.kheti.sample"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        // 版本与库同源（gradle.properties 的 kheti.version）：
+        // GitHub Release 的标签 sample-v<x.y.z> 与 APK 版本因此始终一致，
+        // 且 versionCode 随语义化版本递增，用户可直接覆盖安装新版而无需先卸载。
+        val sampleVersion = providers.gradleProperty("kheti.version").get()
+        val versionParts = sampleVersion.split('.').map { it.filter(Char::isDigit).toIntOrNull() ?: 0 }
+        versionName = sampleVersion
+        versionCode = (versionParts.getOrNull(0) ?: 0) * 10000 +
+            (versionParts.getOrNull(1) ?: 0) * 100 + (versionParts.getOrNull(2) ?: 0)
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
