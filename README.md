@@ -20,10 +20,12 @@
 | **渲染级对拍**：与真实 Chrome 中的 `heti@0.9.6` 逐字几何比对 | 纯 CJK 最大偏差 **0.03px**（`reference/browser-geometry.tsv`） |
 | 竖排（Compose 全平台零支持） | 6 列、列距 = 行高 30 逻辑px、縦中横、区域标点、悬挂、ruby 在基文右侧 |
 | 真机与桌面规则等价（与字体无关的量） | `KhetiEngineAndroidTest`（真机 PJZ110 / Android 16） |
+| 已发布到 Maven Central，第三方可一行依赖 | `io.github.iamkings:kheti-compose:0.1.0`（Android AAR / Desktop JAR / iOS klib，全构件带 GPG 签名） |
 
-## 引用（第三方项目）
+## 引用
 
-已按标准 Maven 坐标发布，可直接依赖，无需源码引入：
+已发布到 **Maven Central**：[io.github.iamkings](https://central.sonatype.com/search?q=io.github.iamkings) ·
+[浏览全部构件](https://repo1.maven.org/maven2/io/github/iamkings/)。一行依赖即可，无需源码引入：
 
 ```kotlin
 commonMain.dependencies {
@@ -36,8 +38,11 @@ Gradle 会按目标平台自动选构件：Android 取 AAR、Desktop/JVM 取 JAR
 声明为 `api`，使用方只需声明这一个依赖即可编译。
 只需规则层或引擎层时，可单独依赖 `kheti-core` / `kheti-layout`。
 
-> 发布流程（Maven Central / GitHub Packages / JitPack 三条通道、签名与凭据、
-> 上传后必需的一次 Portal 调用）见 **[docs/publishing.md](docs/publishing.md)**。
+> ⚠️ 0.1.0 已永久占用（Maven Central 不可覆盖）。发布新版本先递增
+> `gradle.properties` 的 `kheti.version`，再走
+> **[docs/publishing.md](docs/publishing.md)** 的发布流程
+> （凭据配置有现成脚本 `tools/setup-central-publishing.sh`；上传后必需的一次
+> Portal 调用、动态出口 IP 的绕行方法、镜像同步延迟的说明都在里面）。
 
 ## 快速开始
 
