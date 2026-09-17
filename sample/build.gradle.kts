@@ -65,7 +65,23 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    signingConfigs {
+        // 项目专属 debug 密钥（随仓库分发，口令即 AGP 调试默认值）。
+        // 不配置它时 AGP 会回退到 ~/.android/debug.keystore —— 本机稳定，
+        // 但 GitHub 托管 runner 是一次性虚拟机，每次构建都生成新密钥，
+        // 用户会因签名不一致而无法覆盖安装新 APK。
+        // 注意：仅限 debug 测试包；release 严禁使用该配置。
+        create("khetiDebug") {
+            storeFile = rootProject.file("sample/keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("khetiDebug")
+        }
         getByName("release") { isMinifyEnabled = false }
     }
 }
