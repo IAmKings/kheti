@@ -199,3 +199,30 @@ settingsEvaluated {
   :kheti-compose:publishIosArm64PublicationToMavenLocal
 ```
 
+
+## 7. 示例 App 的下载测试包
+
+示例 App 的 debug APK 由 GitHub Actions 自动构建并发布到 Release：
+
+- **Workflow**：`.github/workflows/sample-apk.yml`
+- **触发**：master 上构建相关文件变更（sample/ kheti-*/ gradle/ gradle.properties …），或手动 `workflow_dispatch`
+- **产物**：`sample/build/outputs/apk/debug/sample-debug.apk`（debug 签名，可直接安装）
+- **Release 标签**：`sample-v<kheti.version>`（与库版本同源）
+
+> 最新测试包：<https://github.com/IAmKings/kheti/releases/tag/sample-v0.1.0>
+
+规则：
+
+| 场景 | 行为 |
+|---|---|
+| 同一版本重复构建 | 覆盖同名资产（`gh release upload --clobber`） |
+| 递增 `kheti.version` 后发布 | 新建 tag / Release，旧版本仍可下载 |
+| sample 的 `versionName` | 取 `kheti.version`；`versionCode` 按语义化版本递增（0.1.0 → 100），可直接覆盖安装 |
+
+注意事项：
+
+- debug APK 用的是 **debug 签名**（CI 上的临时 debug 密钥），**每次 CI 构建的签名可能不同**：
+  若设备上已装过旧版而签名不一致，覆盖安装会失败，需先卸载再安装。
+  （本地构建与 CI 构建之间也是如此 —— 实测两份 APK 的 SHA1 不同。）
+- 依赖走官方仓库由 `settings.gradle.kts` 在 CI 上自动切换（`GITHUB_ACTIONS=true` 时用
+  `google()` / `mavenCentral()`），无需在 workflow 里配置镜像。
