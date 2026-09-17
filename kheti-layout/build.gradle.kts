@@ -86,3 +86,15 @@ tasks.matching { it.name == "copyAndroidDeviceTestComposeResourcesToAndroidAsset
         property.set(layout.buildDirectory.dir("kheti/compose-resources-assets"))
     }
 }
+
+// 浏览器对拍测试（BrowserGeometryParityTest）的参考数据由开发机生成
+// （tools/reference-gen/browser-geometry.mjs，本机 Chrome + 本机 Skia）。
+// 参考字体是 CJK **子集**，子集外的字（『蹏』等）会回退到宿主系统字体，
+// 而累积的逐字位置因此随宿主漂移 —— 所以该测试只在生成参考数据的那台机器上有效。
+// 本机跑（验证证据）；CI 跳过。真正的解法是 A6：提供中西文全覆盖的打包字体。
+val onCi = providers.environmentVariable("GITHUB_ACTIONS").orNull == "true"
+tasks.withType<Test>().configureEach {
+    if (onCi) {
+        filter { excludeTestsMatching("com.kheti.layout.BrowserGeometryParityTest.*") }
+    }
+}

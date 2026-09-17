@@ -39,7 +39,14 @@ class Phase3VerticalTest {
         "不及汪伦送我情。",
     )
 
-    private val style = KhetiTextStyle.of(KhetiMetrics.Size.XLarge)
+    // 字体钉住已提交的参考字体，而不是平台默认字体：
+    // 默认字体的 CJK advance 因宿主而异（本机 = 字号，CI runner 不同），
+    // 会让"字距 0.125em → 步进 22.5px"这类**绝对几何**断言只在生成它的机器上成立。
+    // 参考字体随仓库提交且 CJK 等宽，本机/CI/真机结果一致。
+    private val style = KhetiTextStyle.of(
+        KhetiMetrics.Size.XLarge,
+        loadFont("lxgw_neozhisong_screen.ttf") ?: FontFamily.Default,
+    )
 
     private fun engine(family: FontFamily = FontFamily.Default): KhetiVerticalEngine {
         val measurer = TextMeasurer(createFontFamilyResolver(), Density(1f), LayoutDirection.Ltr)
