@@ -83,8 +83,14 @@ jobs:
             "https://repo1.maven.org/maven2/io/github/iamkings/kheti-core/${V}/kheti-core-${V}.pom")
           echo "Maven Central 上 kheti-core ${V} 的 POM 状态：$CODE"
           if [ "$CODE" = "200" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::版本 ${V} 已发布到 Maven Central（版本不可覆盖），跳过库发布"
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              # dry_run 不上传，可以安全地继续走完整流程（用 publishToMavenLocal）
+              echo "::notice::版本 ${V} 已在 Central；dry_run 下继续走流程以验证 CI 凭据"
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "::notice::版本 ${V} 已发布到 Maven Central（版本不可覆盖），跳过库发布"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
           elif [ "$CODE" = "404" ]; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "版本 ${V} 尚未发布 → 继续库发布"
@@ -105,6 +111,12 @@ jobs:
       - name: Preflight — sign one publication
         if: steps.gate.outputs.skip == 'false'
         run: ./gradlew :kheti-compose:signDesktopPublication --stacktrace
+
+      # dry_run 用 publishToMavenLocal 走**完整的发布任务图**（含签名与依赖解析），
+      # 但完全不碰 Central —— 用于验证 CI 凭据与流程，不产生不可逆发布
+      - name: Publish library (dry run → mavenLocal)
+        if: steps.gate.outputs.skip == 'false' && inputs.dry_run == true
+        run: ./gradlew publishToMavenLocal --stacktrace
 
       - name: Publish library to Maven Central (staging)
         if: steps.gate.outputs.skip == 'false' && inputs.dry_run != true
