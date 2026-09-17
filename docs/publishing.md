@@ -226,3 +226,41 @@ settingsEvaluated {
   （本地构建与 CI 构建之间也是如此 —— 实测两份 APK 的 SHA1 不同。）
 - 依赖走官方仓库由 `settings.gradle.kts` 在 CI 上自动切换（`GITHUB_ACTIONS=true` 时用
   `google()` / `mavenCentral()`），无需在 workflow 里配置镜像。
+
+## 8. CI 自动发布（GitHub Actions）
+
+两个 workflow，一次 push 同时满足"库发布 + 示例 APK 更新"：
+
+| Workflow | 触发 | 作用 |
+|---|---|---|
+| `sample-apk.yml` | master 上构建相关文件变更 / 手动 | 构建 debug APK → GitHub Release（可覆盖） |
+| `maven-central.yml` | 同上 / 手动 | 库三模块发布到 Maven Central（版本门禁） |
+
+**为什么 Central 不能照搬 APK 的"覆盖"逻辑**：Central 版本不可变。
+`maven-central.yml` 先查 `repo1` 上 `kheti-core-<v>.pom` 的状态：
+`404` → 才 `./gradlew publish`；`200` → 跳过（APK 照常更新）。
+
+发布流程（默认）：
+
+```
+版本门禁 → 84 项桌面测试 → 签名预检（signDesktopPublication）
+        → ./gradlew publish（staging）
+        → POST /manual/upload/defaultRepository/io.github.iamkings
+        → 人工到 Portal 点 Publish（不可逆）
+```
+
+手动触发可选项：
+
+- `dry_run=true`：用 `publishToMavenLocal` 走**完整**发布任务图（含签名），
+  完全不碰 Central —— 验证 CI 凭据与流程
+- `auto_release=true`：`publishing_type=automatic`，校验通过后自动 Publish（不可逆）
+
+**凭据**（已配置为 GitHub Secrets，Actions 的 secret 只写不可读）：
+`SONATYPE_USERNAME` / `SONATYPE_PASSWORD` / `SIGNING_KEY`（ASCII 私钥）/ `SIGNING_PASSWORD`。
+CI 上无需 keyFile —— `gradle/publishing.gradle.kts` 优先读环境变量。
+
+**CI 上跳过的测试**：`BrowserGeometryParityTest`（浏览器对拍）。
+其参考数据由开发机生成、参考字体是 CJK 子集，子集外的字回退宿主字体，
+逐字累积位置随宿主漂移 —— 该测试只在生成参考数据的那台机器有效
+（`kheti-layout/build.gradle.kts` 在 `GITHUB_ACTIONS=true` 时排除它）。
+真正的解法是 A6：提供中西文全覆盖的打包字体。
