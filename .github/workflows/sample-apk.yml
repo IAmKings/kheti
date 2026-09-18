@@ -1,6 +1,6 @@
 # 构建 kheti 示例 App 的 debug APK，并发布到 GitHub Release 供用户下载测试。
 #
-# 触发：master 上与构建相关的文件变更，或手动触发。
+# 触发：master 上与构建相关的文件变更、版本 tag（v* / sample-v*），或手动触发。
 # 产物：sample/build/outputs/apk/debug/sample-debug.apk（debug 签名，可直接安装）
 #
 # Release 标签为 sample-v<kheti.version>，与库版本同源：
@@ -15,6 +15,7 @@ name: Sample APK
 on:
   push:
     branches: [master]
+    tags: ["v*", "sample-v*"]
     paths:
       - "sample/**"
       - "kheti-core/**"

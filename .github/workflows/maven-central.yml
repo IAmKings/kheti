@@ -23,6 +23,7 @@ name: Maven Central Release
 on:
   push:
     branches: [master]
+    tags: ["v*"]
     paths:
       - "kheti-core/**"
       - "kheti-layout/**"
