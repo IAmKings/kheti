@@ -30,3 +30,6 @@ tools/reference-gen/.browser-geometry.html
 # reference/*.tsv     规则级与渲染级金标准
 # reference/fonts/    对拍所用 OFL 字体（KhetiFontFamilies / 测试共用同一 TTF）
 # docs/  .trellis/    需求基线与流程记录
+
+# ---- Python ----
+__pycache__/
