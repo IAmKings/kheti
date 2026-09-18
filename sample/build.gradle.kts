@@ -93,6 +93,11 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg)
             packageName = "KhetiSample"
             packageVersion = "1.0.0"
+            // 桌面端图标：iconFile 属于平台设置，且 macOS 的 jpackage 要求 .icns
+            // （由 tools/appicon/generate.py 经 iconutil 生成）
+            macOS {
+                iconFile.set(project.file("desktop-icon.icns"))
+            }
         }
     }
 }

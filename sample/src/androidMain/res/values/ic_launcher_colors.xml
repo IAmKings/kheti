@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 印面底色（朱砂）：与 tools/appicon/generate.py 的 RED 同源，改图标须同步 -->
+<resources>
+    <color name="ic_launcher_background">#A83226</color>
+</resources>
